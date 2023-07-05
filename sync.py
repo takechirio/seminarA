@@ -87,6 +87,7 @@ def touch_judge(hand_x,hand_y,dx,dy,fore_img,image):
          return True
       else:
          return False
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-v', '--video_path', type=str, default='', help='Path to the video file.')
 args = parser.parse_args()
@@ -110,10 +111,13 @@ previous_time = 0
 now_time = 0
 dist = 0
 
+count = 0
+
 vx = v0*math.cos(angle*math.pi/180.0)
 vy = -v0*math.sin(angle*math.pi/180.0)
-fore_img = cv2.imread("mediapipe\data\cat.png")
+fore_img = cv2.imread("data\cat.png")
 fore_img = cv2.resize(fore_img, (100, 150))
+start_time = time.perf_counter()
 with mp_pose.Pose(
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5) as pose:
@@ -130,28 +134,37 @@ with mp_pose.Pose(
       image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
       pose_results = pose.process(image)
       hands_results = hands.process(image)
+
+      #計測フレーム数を増加
+      count +=1
+      
  
       # 検出されたポーズの骨格をカメラ画像に重ねて描画
       image.flags.writeable = True
       image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+      dx = int(px)    # 横方向の移動距離
+      dy = int(py)    # 縦方向の移動距離
       if hands_results.multi_hand_landmarks:
         x=hands_results.multi_hand_landmarks[0].landmark[1].x
         y=hands_results.multi_hand_landmarks[0].landmark[1].y
         height, weight = image.shape[:2]
-        #print(x*weight,y*height)
         previous_hands_pos = now_hands_pos
         now_hands_pos = [x*weight,y*height]
         dist = distance.euclidean(previous_hands_pos, now_hands_pos)
-        #print(dist)
+        # ラジアン単位を取得
+        radian = math.atan2(previous_hands_pos[1] - now_hands_pos[1], previous_hands_pos[0] - now_hands_pos[0])
+        # ラジアン単位から角度を取得
+        degree = radian * (180 / math.pi)
+        print(degree)
         previous_time = now_time
         now_time = time.perf_counter()
 
         hand_velocity = dist/(now_time - previous_time)
 
-        print(hand_velocity)
-        if(touch_judge(x*weight,y*height,dx,dy,fore_img,image)):
+        for hand_landmarks in hands_results.multi_hand_landmarks[0].landmark:
+          if(touch_judge(hand_landmarks.x*weight,hand_landmarks.y*height,dx,dy,fore_img,image)):
            cat_touched = True
-        '''
+        
         for hand_landmarks in hands_results.multi_hand_landmarks:
           mp_drawing.draw_landmarks(
               image,
@@ -160,16 +173,15 @@ with mp_pose.Pose(
               mp_drawing_styles.get_default_hand_landmarks_style(),
               mp_drawing_styles.get_default_hand_connections_style())
           cv2.drawMarker(image,(100,100),(0,0,0),markerType=cv2.MARKER_STAR, markerSize=10)
-        '''
+        
       mp_drawing.draw_landmarks(
           image,
           pose_results.pose_landmarks,
           mp_pose.POSE_CONNECTIONS,
           landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style())
-      dx = int(px)    # 横方向の移動距離
-      dy = int(py)    # 縦方向の移動距離
 
-      if(cat_touched):
+
+      if(True):
         if(cat_firstflag):
           print("awrawawrarw")
           print(hand_velocity)
@@ -185,6 +197,11 @@ with mp_pose.Pose(
         vy = vy+g*dt
       image = comp(fore_img,image,dx,dy)
       cv2.imshow('MediaPipe Pose', cv2.flip(image, 1))
+      now_time =time.perf_counter()
+      if(now_time -start_time > 5.0):
+         print("Frame is")
+         print(count/(now_time - start_time))
+         break
       if cv2.waitKey(5) & 0xFF == 27:
         break
 cap.release()
