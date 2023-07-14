@@ -1,12 +1,14 @@
-import cv2
-import mediapipe as mp
-import numpy as np
-import math
-from scipy.spatial import distance
-import time
-import argparse
+from matplotlib import pyplot as pyp
+date = [44,6,0]
+labels = ['expected', 'speed error', 'touch error']
 
-fore_img = cv2.imread(r"data\ball.png")
-fore_img = cv2.resize(fore_img, (100, 100))
-cv2.imshow('MediaPipe Pose', fore_img)
-cv2.waitKey()
+pyp.title("error rate[hand:slow]")
+pyp.pie(date, startangle=90, counterclock=False,  autopct='%.1f%%', pctdistance=0.8, labels=labels)
+pyp.show()
+
+date = [29,8,13]
+labels = ['expected', 'speed error', 'touch error']
+
+pyp.title("error rate[hand:quick]")
+pyp.pie(date, startangle=90, counterclock=False,  autopct='%.1f%%', pctdistance=0.8, labels=labels)
+pyp.show()
