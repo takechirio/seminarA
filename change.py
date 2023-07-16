@@ -18,9 +18,11 @@ angle = 0
 def identify_hand(landmark):
   landmark_x=list()
   landmark_y=list()
+  landmark_z=list()
   for i in range(21):
     landmark_x.append(landmark[i].x)
     landmark_y.append(landmark[i].y)
+    landmark_z.append(landmark[i].z)
   
   fingers=list() #親指、人差し指、中指、薬指、小指
   straight_finger=0
@@ -33,14 +35,31 @@ def identify_hand(landmark):
     if (abs(coef[0][1])>0.9):
       straight_finger+=1
 
-  #print(straight_finger)
-
   if straight_finger==5:
-    print("paa")
-    return 1
+    for i in range(5):
+       finger_root=distance.euclidean((landmark_x[0],landmark_y[0]),(landmark_x[4*i+1],landmark_y[4*i+1]))
+       finger_tip=distance.euclidean((landmark_x[0],landmark_y[0]),(landmark_x[4*(i+1)],landmark_y[4*(i+1)]))
+       if(finger_tip<finger_root):
+          straight_finger-=1
+    if(straight_finger==5):
+      print("paa")
+      return 1
+    else:
+      print("guu2")
+      return 2
   elif straight_finger==1 or straight_finger==0:
-    print("guu")
-    return 2
+    abs_z=0
+    for i in range(5):
+       #print(abs(landmark_z[0]-landmark_z[4*(i+1)]))
+       if(abs(landmark_z[0]-landmark_z[4*(i+1)])>0.1):
+          abs_z+=1
+    
+    if(abs_z>3):
+       print("paa2")
+       return 1
+    else:
+      print("guu")
+      return 2
   
   return -1
 
@@ -92,7 +111,6 @@ def move_obj(fore_image,x,y,v):
 
    #elif(hands == 'paa'):
      # None
-   
 
 def touch_judge(hand_x,hand_y,dx,dy,fore_img,image):
       h, w = fore_img.shape[:2]
@@ -115,8 +133,6 @@ def in_rect(image,pose_landmark,target):
     c = (pose_landmark[24].x*w, pose_landmark[24].y*h)
     d = (pose_landmark[23].x*w, pose_landmark[23].y*h)
     e = (target[0], target[1])
-
-
 
     # 原点から点へのベクトルを求める
     vector_a = np.array(a)
@@ -141,8 +157,6 @@ def in_rect(image,pose_landmark,target):
     vector_cross_cd_ce = np.cross(vector_cd, vector_ce)
     vector_cross_da_de = np.cross(vector_da, vector_de)
     result=(vector_cross_ab_ae < 0 and vector_cross_bc_be < 0 and vector_cross_cd_ce < 0 and vector_cross_da_de < 0)
-    if result:
-      print(result)
     return result
       
 def reflect(angle,fore_img, image, dx,dy):
@@ -157,19 +171,12 @@ def reflect(angle,fore_img, image, dx,dy):
       if back_x_min < 0 or back_x_max > back_w:
           angle=180-angle
           reflect_flag = True
-          obj_vec=obj_vec+50
 
       if back_y_min < 0 or back_y_max > back_h:
           angle=-1*angle
           reflect_flag = True
-          obj_vec=obj_vec+50
 
       return angle
-
-def show_goal(image,goal1,goal2):
-   h, w = image.shape[:2]
-   cv2.line(image,(10,int(goal1)),(10,int(goal1+150)),color=(0, 255, 0),thickness=3,lineType=cv2.LINE_4,shift=0)
-   cv2.line(image,(w-10,int(goal2)),(w-10, int(goal2+150)),color=(0, 255, 0),thickness=3,lineType=cv2.LINE_4,shift=0)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-v', '--video_path', type=str, default='', help='Path to the video file.')
@@ -182,35 +189,38 @@ else:
 width=cap.get(cv2.CAP_PROP_FRAME_WIDTH)
 height=cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
+#ボールの初期位置
 px=random.randint(1,width-100)
 py=random.randint(1,height-100)
 
+#フラグ
+game_finish_flag=False
 obj_touched = False
 obj_touch_now = False
+bomb_flag = False
+bomb_first_flag = True
+
 hand_velocity = 0
-obj_vec=500
+obj_vec=300
 previous_hands_pos = [0,0]
 now_hands_pos = [0,0] 
 previous_hand_time = 0
 now_hand_time = 0
 dist = 0
 reflect_flag = True
-goal1=random.randint(1,height-100)
-goal2=random.randint(1,height-100)
-flag_goal1=1
-flag_goal2=-1
 count = 0
 nowtime = 0
 pasttime = 0
 change_time = 0
-bomb_flag = False
-fore_img = cv2.imread(r"data\ball.png")
+
+
+fore_img = cv2.imread(r"data/ball.png")
 fore_img = cv2.resize(fore_img, (100, 100))
-bomb_img = cv2.imread(r"data\bomb.png")
+bomb_img = cv2.imread(r"data/bomb.png")
 bomb_img = cv2.resize(bomb_img, (100, 100))
 start_time = time.perf_counter()
 previous_hand_time = start_time
-bomb_first_flag = True
+
 with mp_pose.Pose(
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5) as pose:
@@ -247,6 +257,11 @@ with mp_pose.Pose(
         duration = now_hand_time - previous_hand_time
 
         for hand_landmarks in hands_results.multi_hand_landmarks:
+          hand=identify_hand(hand_landmarks.landmark)
+          if(hand==1):
+              cv2.putText(image,"paa",(int(hand_landmarks.landmark[0].x),int(hand_landmarks.landmark[0].y)),cv2.FONT_HERSHEY_SIMPLEX,1.0,color=(0, 255, 0),thickness=2,lineType=cv2.LINE_4)
+          elif(hand==2):
+              cv2.putText(image,"guu",(int(hand_landmarks.landmark[0].x),int(hand_landmarks.landmark[0].y)),cv2.FONT_HERSHEY_SIMPLEX,1.0,color=(0, 255, 0),thickness=2,lineType=cv2.LINE_4)
           for hand_landmark in hand_landmarks.landmark:
             if(touch_judge(hand_landmark.x*weight,hand_landmark.y*height,int(px),int(py),fore_img,image)):
               obj_touched = True
@@ -266,67 +281,72 @@ with mp_pose.Pose(
           mp_pose.POSE_CONNECTIONS,
           landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style())
 
-      show_goal(image,goal1,goal2)
-
-      if(flag_goal1==-1):
-         goal1=goal1-10
-      else:
-         goal1=goal1+10
-
-      if(flag_goal2==-1):
-         goal2=goal2-10
-      else:
-         goal2=goal2+10
-
-      if(goal1>height-150 or goal1<0):
-        flag_goal1=flag_goal1*(-1)
-      if(goal2>height-150 or goal2<0):
-        flag_goal2=flag_goal2*(-1)
-
       if(obj_touched):
-        if(obj_touch_now and reflect_flag and now_hand_time - change_time >0.5):
+        angle = reflect(angle,fore_img, image, int(px),int(py))
+        if(reflect_flag and (not game_finish_flag) and (not bomb_flag)):
+            obj_vec=obj_vec+10
+            reflect_flag=False
+        if(obj_touch_now and now_hand_time - change_time >0.5):
           if(identify_hand(hands_results.multi_hand_landmarks[0].landmark)==1):
-             bomb_flag = True
+            bomb_flag = True
           change_time = now_hand_time
-          reflect_flag = False
+          #reflect_flag = False
           dist = distance.euclidean(previous_hands_pos, now_hands_pos)
           hand_velocity = dist/duration
-          #obj_vec = hand_velocity/2
           # ラジアン単位を取得
           radian = -1*math.atan2(previous_hands_pos[1] - now_hands_pos[1], now_hands_pos[0] - previous_hands_pos[0] )
           # ラジアン単位から角度を取得
           angle = radian * (180 / math.pi)
           #print(hand_velocity)
-        #x,y = move_img()
+
         #画像の位置変更
-        angle = reflect(angle,fore_img, image, int(px),int(py))
         vx = obj_vec*math.cos(angle*math.pi/180.0)
         vy = obj_vec*math.sin(angle*math.pi/180.0)
         px = px+vx*(nowtime - pasttime)
         py = py+vy*(nowtime - pasttime)
-      if(pose_results.pose_landmarks):
-        in_rect(image,pose_results.pose_landmarks.landmark,(px,py))
-      
 
-      if(bomb_flag):
+        #TODO ゲームオーバー
+        if(pose_results.pose_landmarks):
+          if(in_rect(image,pose_results.pose_landmarks.landmark,(px,py))):
+            print("GAME OVER")
+            game_finish_flag=True
+            obj_touched=False
+            obj_touch_now=False
+            bomb_first_flag=True
+            bomb_flag=False
+        
+      if(game_finish_flag):
+        image = cv2.flip(image, 1)
+        cv2.putText(image,"GAME OVER",(100,300),cv2.FONT_HERSHEY_SIMPLEX,5.0,color=(0, 0, 255),thickness=2,lineType=cv2.LINE_4)
+      elif(bomb_flag):
         if(bomb_first_flag):
-           bomb_first_flag = False
-           bom_x = int(px)
-           bom_y = int(py)
-           bom_start_time = time.perf_counter()
+          bomb_first_flag = False
+          bom_x = int(px)
+          bom_y = int(py)
+          bom_start_time = time.perf_counter()
         if(time.perf_counter()-bom_start_time <2.0):
           image = comp(bomb_img,image,bom_x,bom_y)
         image = cv2.flip(image, 1)
       else:
         image = comp(fore_img,image,int(px),int(py))
         image = cv2.flip(image, 1)
-        cv2.putText(image,'ball',(int(width-px),int(py)),cv2.FONT_HERSHEY_SIMPLEX,1.0,color=(0, 255, 0),thickness=2,lineType=cv2.LINE_4)
-
-        #TODO 得点　ボールの速度の表示
-        cv2.putText(image,str(obj_vec),(100,100),cv2.FONT_HERSHEY_SIMPLEX,1.0,color=(0, 255, 0),thickness=2,lineType=cv2.LINE_4)
-
+      
+      cv2.putText(image,str(obj_vec),(100,100),cv2.FONT_HERSHEY_SIMPLEX,1.0,color=(0, 255, 0),thickness=2,lineType=cv2.LINE_4)
+        
       obj_touch_now = False
       cv2.imshow('MediaPipe Pose', image)
+      if(nowtime -start_time > 200.0):
+         print("Frame is")
+         print(count/(nowtime -start_time))
+         break
       if cv2.waitKey(5) & 0xFF == 27:
         break
+
+      #TODO リセットボタン
+      if cv2.waitKey(5) & 0xFF == 114:
+        obj_vec=200
+        px=random.randint(1,width-100)
+        py=random.randint(1,height-100)
+        game_finish_flag=False
+         
 cap.release()
