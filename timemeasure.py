@@ -169,10 +169,8 @@ handtime = []
 posetime = []
 balltime = []
 first = True
-with mp_pose.Pose(
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5) as pose:
-  with mp_hands.Hands(
+
+with mp_hands.Hands(
     model_complexity=0,
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5) as hands:
@@ -183,9 +181,6 @@ with mp_pose.Pose(
         break
       image.flags.writeable = True
       image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-      measuretime = time.perf_counter()
-      pose_results = pose.process(image)
-      posetime.append(time.perf_counter() - measuretime)
       measuretime = time.perf_counter()
       hands_results = hands.process(image)
       handtime.append(time.perf_counter() - measuretime)
@@ -208,11 +203,6 @@ with mp_pose.Pose(
               mp_drawing_styles.get_default_hand_landmarks_style(),
               mp_drawing_styles.get_default_hand_connections_style())
         
-      mp_drawing.draw_landmarks(
-          image,
-          pose_results.pose_landmarks,
-          mp_pose.POSE_CONNECTIONS,
-          landmark_drawing_spec=mp_drawing_styles.get_default_pose_landmarks_style())
       
       frametime.append(time.perf_counter() - measuretime)
       measuretime = time.perf_counter()
@@ -269,7 +259,7 @@ with mp_pose.Pose(
       measuretime = time.perf_counter()
       obj_touch_now = False
       cv2.imshow('MediaPipe Pose', cv2.flip(image, 1))
-      if(nowtime -start_time > 200.0):
+      if(nowtime -start_time > 30.0):
          print("Frame is")
          print(count/(nowtime -start_time))
          break
@@ -283,12 +273,7 @@ pyp.xlabel("processing time(s/frame)")
 pyp.hist(handtime,bins=30)
 pyp.legend()
 pyp.show()
-pyp.title("pose detection")
-pyp.ylabel("frequency")
-pyp.xlabel("processing time(s/frame)")
-pyp.hist(posetime,bins=30)
-pyp.legend()
-pyp.show()
+'''
 pyp.title("ball")
 pyp.ylabel("frequency")
 pyp.xlabel("processing time(s/frame)")
@@ -296,7 +281,7 @@ pyp.hist(balltime,bins=30)
 pyp.legend()
 pyp.show()
 
-
+ 
 
 date = []
 date.append(statistics.mean(handtime))
@@ -306,3 +291,4 @@ labels = ['hand', 'pose', 'ball']
 
 pyp.pie(date, startangle=90, counterclock=False,  autopct='%.1f%%', pctdistance=0.8, labels=labels)
 pyp.show()
+'''

@@ -42,10 +42,10 @@ def identify_hand(landmark):
        if(finger_tip<finger_root):
           straight_finger-=1
     if(straight_finger==5):
-      print("paa")
+      #print("paa")
       return 1
     else:
-      print("guu2")
+      #print("guu2")
       return 2
   elif straight_finger==1 or straight_finger==0:
     abs_z=0
@@ -55,10 +55,10 @@ def identify_hand(landmark):
           abs_z+=1
     
     if(abs_z>3):
-       print("paa2")
-       return 1
+       #print("paa2")
+       return 2
     else:
-      print("guu")
+     # print("guu")
       return 2
   
   return -1
@@ -221,6 +221,7 @@ bomb_img = cv2.resize(bomb_img, (100, 100))
 start_time = time.perf_counter()
 previous_hand_time = start_time
 
+vellist=[]
 with mp_pose.Pose(
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5) as pose:
@@ -247,17 +248,28 @@ with mp_pose.Pose(
       image.flags.writeable = True
       image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
       if hands_results.multi_hand_landmarks:
-        x=hands_results.multi_hand_landmarks[0].landmark[9].x
-        y=hands_results.multi_hand_landmarks[0].landmark[9].y
+        x=hands_results.multi_hand_landmarks[0].landmark[12].x
+        y=hands_results.multi_hand_landmarks[0].landmark[12].y
         height, weight = image.shape[:2]
         previous_hands_pos = now_hands_pos
         now_hands_pos = [x*weight,y*height]
         previous_hand_time = now_hand_time
         now_hand_time = nowtime
         duration = now_hand_time - previous_hand_time
+        dist = distance.euclidean(previous_hands_pos, now_hands_pos)
+        vellist.append(dist/duration)
+        if(len(vellist)>10):
+           vellist.pop(0)
+        hand_velocity = sum(vellist)/len(vellist)
+        print(hand_velocity)
+           
 
         for hand_landmarks in hands_results.multi_hand_landmarks:
-          #hand=identify_hand(hand_landmarks.landmark)
+          hand=identify_hand(hand_landmarks.landmark)
+          if(hand==1):
+              cv2.putText(image,"paa",(int(hand_landmarks.landmark[0].x),int(hand_landmarks.landmark[0].y)),cv2.FONT_HERSHEY_SIMPLEX,1.0,color=(0, 255, 0),thickness=2,lineType=cv2.LINE_4)
+          elif(hand==2):
+              cv2.putText(image,"guu",(int(hand_landmarks.landmark[0].x),int(hand_landmarks.landmark[0].y)),cv2.FONT_HERSHEY_SIMPLEX,1.0,color=(0, 255, 0),thickness=2,lineType=cv2.LINE_4)
           for hand_landmark in hand_landmarks.landmark:
             if(touch_judge(hand_landmark.x*weight,hand_landmark.y*height,int(px),int(py),fore_img,image)):
               obj_touched = True
@@ -279,26 +291,16 @@ with mp_pose.Pose(
 
       if(obj_touched):
         angle = reflect(angle,fore_img, image, int(px),int(py))
-        if(px<0):
-           px = 0
-        if(px > width):
-           px = width
-        if(py<0):
-           py = 0
-        if(py > height):
-           py = height        
         if(reflect_flag and (not game_finish_flag) and (not bomb_flag)):
-            obj_vec=obj_vec+50
+            obj_vec=obj_vec+10
             reflect_flag=False
         if(obj_touch_now and now_hand_time - change_time >0.5):
           if(identify_hand(hands_results.multi_hand_landmarks[0].landmark)==1):
             bomb_flag = True
-            obj_touched=False
-            obj_touch_now=False
           change_time = now_hand_time
           #reflect_flag = False
-          dist = distance.euclidean(previous_hands_pos, now_hands_pos)
-          hand_velocity = dist/duration
+          #dist = distance.euclidean(previous_hands_pos, now_hands_pos)
+          #hand_velocity = dist/duration
           # ラジアン単位を取得
           radian = -1*math.atan2(previous_hands_pos[1] - now_hands_pos[1], now_hands_pos[0] - previous_hands_pos[0] )
           # ラジアン単位から角度を取得
@@ -323,19 +325,7 @@ with mp_pose.Pose(
         
       if(game_finish_flag):
         image = cv2.flip(image, 1)
-        text = "GAME OVER"
-        face = cv2.FONT_HERSHEY_SIMPLEX
-        height = 100
-        thickness = 3
-        while(True):
-          scale = cv2.getFontScaleFromHeight(face, int(height), thickness)
-          size, baseline = cv2.getTextSize(text, face, scale, thickness)
-          if(size[0]>width-100):
-             height = height * 0.9
-          else :
-             break
-
-        cv2.putText(image,text,(50,100),cv2.FONT_HERSHEY_SIMPLEX,scale,color=(0, 0, 255),thickness=2,lineType=cv2.LINE_4)
+        cv2.putText(image,"GAME OVER",(100,300),cv2.FONT_HERSHEY_SIMPLEX,5.0,color=(0, 0, 255),thickness=2,lineType=cv2.LINE_4)
       elif(bomb_flag):
         if(bomb_first_flag):
           bomb_first_flag = False
@@ -345,27 +335,11 @@ with mp_pose.Pose(
         if(time.perf_counter()-bom_start_time <2.0):
           image = comp(bomb_img,image,bom_x,bom_y)
         image = cv2.flip(image, 1)
-        #スコアの表示
-        text = "score is " + str(obj_vec)
-        face = cv2.FONT_HERSHEY_SIMPLEX
-        height = 100
-        thickness = 3
-        while(True):
-          scale = cv2.getFontScaleFromHeight(face, int(height), thickness)
-          size, baseline = cv2.getTextSize(text, face, scale, thickness)
-          if(size[0]>width-100):
-             height = height * 0.9
-          else :
-             break
-
-        cv2.putText(image,text,(50,100),cv2.FONT_HERSHEY_SIMPLEX,scale,color=(0, 255, 0),thickness=2,lineType=cv2.LINE_4)
       else:
         image = comp(fore_img,image,int(px),int(py))
         image = cv2.flip(image, 1)
-        #スコアの表示
-        cv2.putText(image,str(obj_vec),(100,100),cv2.FONT_HERSHEY_SIMPLEX,1.0,color=(0, 255, 0),thickness=2,lineType=cv2.LINE_4)
       
-      
+      cv2.putText(image,str(obj_vec),(100,100),cv2.FONT_HERSHEY_SIMPLEX,1.0,color=(0, 255, 0),thickness=2,lineType=cv2.LINE_4)
         
       obj_touch_now = False
       cv2.imshow('MediaPipe Pose', image)
@@ -381,7 +355,6 @@ with mp_pose.Pose(
         obj_vec=200
         px=random.randint(1,width-100)
         py=random.randint(1,height-100)
-        game_finish_flag=False
         obj_touched=False
         obj_touch_now=False
         bomb_first_flag=True
